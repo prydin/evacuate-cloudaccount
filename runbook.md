@@ -47,8 +47,6 @@ deployment has not yet been verified.
    retired vCenter endpoint. Do not disconnect unrelated accounts or shared
    infrastructure. Arrange physical infrastructure cleanup separately.
 
-**Go/no-go:** retirement, backup, isolation, and application-owner approval are
-documented. Otherwise stop.
 
 ## 2. Prepare to run the scripts
 
