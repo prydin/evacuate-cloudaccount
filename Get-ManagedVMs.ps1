@@ -42,6 +42,7 @@ function Invoke-Vra($Method, $Path, $Body) {
 }
 
 # Log in
+$script:token = $null # Discard any token retained by a previous dot-sourced run.
 $login = @{ username = $User; password = $Password }
 if ($Domain) { $login.domain = $Domain }
 $refresh = (Invoke-Vra POST '/csp/gateway/am/api/login?access_token' $login)['refresh_token']

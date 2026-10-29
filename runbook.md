@@ -15,15 +15,22 @@ deployment has not yet been verified.
 
 ## Critical warnings
 
-- `-DeploymentCleanup` deletes the **entire deployment**, including related
+- The deletion script always deletes the **entire deployment**, including related
   resources, not just the CSV's VMs. Review disks, networks, integrations, and
   resources outside the target account before approving.
-- Every machine in a deployment must appear in the CSV. This check does not
-  establish that all non-machine resources are safe to remove.
-- `-DeploymentCleanup` allows Automation cleanup despite infrastructure
+- Every machine in a deployment must appear in the CSV, and those machines must
+  all name the same cloud account. Every deployment resource (including disks,
+  networks, and other non-machine resources) must have a `properties.endpointId`
+  matching that account. A different or absent account ID blocks cleanup,
+  including with `-All`. Matching membership alone does not establish that a
+  shared resource is safe to remove; manual resource review is still required.
+- Ignore Delete Failures allows Automation cleanup despite infrastructure
   deletion failures. It is not a guarantee that infrastructure deletion is
   never attempted. Keep the retired endpoint isolated throughout cleanup.
-- The scripts require the account to report `healthy=false` before execution.
+- Deletion requires the account to report `healthy=false`. Targets on accounts
+  with healthy or unknown health are skipped in preview and execution, while
+  other targets continue. A deployment is skipped if any of its CSV machines
+  references such an account. Health skips are reported separately in the summary.
   Health is a periodic result, not a live connectivity guarantee; it does not
   prove that vCenter is permanently unavailable.
 - There is no script-level undo. Do not proceed if the intention is to recover
@@ -107,7 +114,7 @@ For deployments where every machine is currently missing:
 
 ```powershell
 .\Remove-VMs.ps1 -Server 'automation.example.com' -User 'admin' `
-    -Password '<password>' -CsvFile .\managed-vms.csv -DeploymentCleanup
+    -Password '<password>' -CsvFile .\managed-vms.csv
 ```
 
 For permanent retirement of the entire account, status may remain `SUCCESS`
@@ -116,7 +123,7 @@ preview with:
 
 ```powershell
 .\Remove-VMs.ps1 -Server 'automation.example.com' -User 'admin' `
-    -Password '<password>' -CsvFile .\managed-vms.csv -DeploymentCleanup -All
+    -Password '<password>' -CsvFile .\managed-vms.csv -All
 ```
 
 `-All` bypasses only the missing-status filter. It does not bypass cloud-account
@@ -132,8 +139,9 @@ Review the preview for:
 - Expected skips and expected deployment count.
 
 Preview performs read-only checks; it does not prove that Delete is available
-or will succeed. Execution also checks action availability and whether the
-deployment Delete schema exposes `ignoreDeleteFailures`.
+or will succeed. Execution checks action availability and sends
+`ignoreDeleteFailures=true` for deployment cleanup without requiring that input
+to appear in the action metadata. Server-side failures are logged.
 
 **Stop** on incomplete coverage, unexpected resources, account mismatches, or an
 unexplained count difference. Do not weaken the guards to continue.
@@ -149,25 +157,27 @@ For an approved account-wide retirement:
 ```powershell
 .\Remove-VMs.ps1 -Server 'automation.example.com' -User 'admin' `
     -Password '<password>' -CsvFile .\managed-vms.csv `
-    -DeploymentCleanup -All -Execute -Concurrency 1 `
+    -All -Execute -Concurrency 1 `
     -TimeoutSeconds 600 -ErrorFile .\cleanup-errors.csv
 ```
 
 Point `-CsvFile` at the pilot CSV for the initial run. For missing-only cleanup,
 omit `-All`. Once the pilot succeeds, increase concurrency if appropriate; the
-default is 5. In this mode, concurrency counts deployment requests, not VMs.
+default is 5. Concurrency counts deployment requests, not VMs.
 
-Ordinary VM Delete without `-DeploymentCleanup` may fail trying to contact the
-broken vCenter, as observed in this environment. It does not enable Ignore
-Delete Failures.
+The script always submits deployment Delete with Ignore Delete Failures.
+Individual VM Delete is no longer offered.
 
-Record request IDs and outcomes. In deployment-cleanup mode, error-log `Id` and
+Record request IDs and outcomes. Error-log `Id` and
 `DeploymentId` identify the deployment rather than an individual VM.
 
 ### Handling errors and timeouts
 
 - Review the current run's error CSV and the requests in Automation. Error logs
   append records; use a distinct filename per run.
+- Deployment cleanup skips deployments whose own lookup returns HTTP 404,
+  reporting that they were already deleted rather than logging an error.
+  Missing child resources or actions are still treated as errors.
 - A timeout or polling failure does **not** cancel the server request. A
   submission response without a request ID may still mean it was accepted.
 - Do not retry until you establish whether the original request completed or
