@@ -20,10 +20,12 @@ deployment has not yet been verified.
   resources outside the target account before approving.
 - Every machine in a deployment must appear in the CSV, and those machines must
   all name the same cloud account. Every deployment resource (including disks,
-  networks, and other non-machine resources) must have a `properties.endpointId`
-  matching that account. A different or absent account ID blocks cleanup,
-  including with `-All`. Matching membership alone does not establish that a
-  shared resource is safe to remove; manual resource review is still required.
+  networks, and other non-machine resources) except `Cloud.Ansible.Tower` must
+  have a `properties.endpointId` matching that account. `Cloud.Ansible.Tower` is
+  a reference resource that is excluded from account-membership checks. A
+  different or absent account ID on any other resource blocks cleanup, including
+  with `-All`. Matching membership alone does not establish that a shared
+  resource is safe to remove; manual resource review is still required.
 - Ignore Delete Failures allows Automation cleanup despite infrastructure
   deletion failures. It is not a guarantee that infrastructure deletion is
   never attempted. Keep the retired endpoint isolated throughout cleanup.

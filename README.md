@@ -11,8 +11,10 @@ unreachable vCenter.
   Delete Failures. Unless `-All` is supplied, all machines must be missing based
   on live status. `-Concurrency` limits deployment requests (default 5).
   It requires every machine in each deployment to be listed in the CSV.
-  Every deployment resource must have a verified cloud account matching that
-  deployment's CSV machines; mixed or unknown account membership blocks cleanup.
+  Every deployment resource except `Cloud.Ansible.Tower` must have a verified
+  cloud account matching that deployment's CSV machines; mixed or unknown
+  membership blocks cleanup. `Cloud.Ansible.Tower` is a reference resource and
+  is excluded from account-membership checks.
 
 **Warning:** deployment cleanup removes entire deployments and related resources
 from Automation. Physical infrastructure may remain behind. Execution requires

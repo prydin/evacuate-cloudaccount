@@ -16,9 +16,11 @@ This removes ALL related resources from Automation, including
 disks and networks, and may leave infrastructure behind for manual cleanup.
 Every machine in a deployment must be listed in the CSV and pass the live
 cloud-account check. All CSV machines in a deployment must name the same cloud
-account, and every deployment resource must have a matching properties.endpointId.
-Resources with unknown account membership block cleanup. -All does not bypass
-these checks. Without -All, every machine must be MISSING.
+account, and every deployment resource except Cloud.Ansible.Tower must have a
+matching properties.endpointId. Cloud.Ansible.Tower is a reference resource and
+is excluded from account-membership checks. Other resources with unknown account
+membership block cleanup. -All does not bypass these checks. Without -All, every
+machine must be MISSING.
 Concurrency limits deployment requests rather than individual VM requests.
 Up to -Concurrency (default 5) Delete requests run at the same time; each is
 polled until it finishes or TimeoutSeconds passes. Per-deployment errors are appended
@@ -241,6 +243,7 @@ foreach ($vm in $targets) {
         }
         $targetAccountId = $accountIds[0]
         foreach ($deploymentResource in $resources) {
+            if ($deploymentResource['type'] -eq 'Cloud.Ansible.Tower') { continue }
             $resourceId = $deploymentResource['id']
             $properties = $deploymentResource['properties']
             if ($null -eq $properties -or [string]::IsNullOrWhiteSpace($properties['endpointId'])) {
