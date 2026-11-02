@@ -16,9 +16,11 @@ unreachable vCenter.
 
 **Warning:** deployment cleanup removes entire deployments and related resources
 from Automation. Physical infrastructure may remain behind. Execution requires
-the cloud account to report unhealthy; independently verify vCenter isolation.
-Targets on healthy or unknown-health accounts are skipped without stopping
-cleanup of other targets.
+non-MISSING machines to belong to a cloud account that reports unhealthy;
+independently verify vCenter isolation. Missing-only cleanup does not check
+cloud-account health, so missing VMs can be deleted regardless of vCenter state.
+For non-MISSING machines, targets on healthy or unknown-health accounts are
+skipped without stopping cleanup of other targets.
 
 See the [proposed cleanup runbook](runbook.md) for prerequisites, commands,
 safety checks, verification, and cloud-account removal instructions.

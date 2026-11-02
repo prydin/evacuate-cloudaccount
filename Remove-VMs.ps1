@@ -5,10 +5,11 @@ from Automation using the Delete day-2 action with Ignore Delete Failures.
 .DESCRIPTION
 WARNING: Delete removes the VM from vCenter if Automation can reach it. This is
 only intended for cloud accounts that have lost their vCenter connection.
-Targets whose cloud accounts do not report healthy = false are skipped, without
-stopping other targets. Each VM must still belong to its CSV cloud account.
-Health is Automation's last health-check result; confirm the vCenter really is
-unreachable from Automation before using -Execute.
+Targets with non-MISSING machines are deleted only when their cloud accounts
+report healthy = false; missing machines can be deleted regardless of account
+health. Each VM must still belong to its CSV cloud account. Health is
+Automation's last health-check result; confirm the vCenter really is unreachable
+from Automation before using -Execute for non-MISSING machines.
 Deletes entire deployments with Ignore Delete Failures enabled.
 The CSV SyncStatus column is ignored; machine status is checked live.
 This removes ALL related resources from Automation, including
@@ -120,13 +121,8 @@ if ($Domain) { $login.domain = $Domain }
 $refresh = (Invoke-Vra POST '/csp/gateway/am/api/login?access_token' $login)['refresh_token'] 
 $script:token = (Invoke-Vra POST '/iaas/api/login' @{ refreshToken = $refresh })['token']
 
-# Skip targets on accounts that do not report a disconnected vCenter.
-$blockedAccounts = @{}
-foreach ($accountId in @($vms | Select-Object -ExpandProperty CloudAccountId -Unique)) {
-    $account = Invoke-Vra GET "/iaas/api/cloud-accounts/$([uri]::EscapeDataString($accountId))"
-    Write-Host "Cloud account: $($account['name']) ($accountId) healthy=$($account['healthy'])"
-    if ($account['healthy'] -ne $false) { $blockedAccounts[$accountId] = "$($account['name']) ($accountId)" }
-}
+# Cache health results for accounts used by non-MISSING deployments.
+$accountHealth = @{}
 
 $ErrorFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ErrorFile)
 if ($Execute) {
@@ -215,14 +211,6 @@ $targets = @($vms | Group-Object DeploymentId | ForEach-Object {
 })
 
 foreach ($vm in $targets) {
-    $blocked = @($vm.Machines | Select-Object -ExpandProperty CloudAccountId -Unique |
-        Where-Object { $blockedAccounts.ContainsKey($_) } |
-        ForEach-Object { $blockedAccounts[$_] })
-    if ($blocked.Count -gt 0) {
-        $healthSkipped++
-        Write-Warning "Skipping '$($vm.Name)' ($($vm.Id)): cloud account health is not false: $($blocked -join ', '). Delete could remove actual infrastructure. Continuing with other targets."
-        continue
-    }
     $requestId = ''
     $status = 'STATUS_ERROR'
     try {
@@ -290,6 +278,22 @@ foreach ($vm in $targets) {
             $skipped++
             Write-Host "Skipping: $($vm.Name) ($($vm.Id)) syncStatus=$syncStatus (not MISSING; use -All to include)."
             continue
+        }
+        if ($notMissing) {
+            $accountId = $accountIds[0]
+            if (-not $accountHealth.ContainsKey($accountId)) {
+                $account = Invoke-Vra GET "/iaas/api/cloud-accounts/$([uri]::EscapeDataString($accountId))"
+                Write-Host "Cloud account: $($account['name']) ($accountId) healthy=$($account['healthy'])"
+                $accountHealth[$accountId] = @{
+                    Healthy = $account['healthy'] -eq $false
+                    Name = "$($account['name']) ($accountId)"
+                }
+            }
+            if (-not $accountHealth[$accountId].Healthy) {
+                $healthSkipped++
+                Write-Warning "Skipping '$($vm.Name)' ($($vm.Id)): cloud account health is not false: $($accountHealth[$accountId].Name). Delete could remove actual infrastructure. Continuing with other targets."
+                continue
+            }
         }
         if (-not $Execute) {
             Write-Host "Preview: Would invoke the Delete day-2 action for $($vm.Name) ($($vm.Id)) syncStatus=$syncStatus on $Server."

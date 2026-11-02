@@ -27,12 +27,13 @@ deployment has not yet been verified.
 - Ignore Delete Failures allows Automation cleanup despite infrastructure
   deletion failures. It is not a guarantee that infrastructure deletion is
   never attempted. Keep the retired endpoint isolated throughout cleanup.
-- Deletion requires the account to report `healthy=false`. Targets on accounts
-  with healthy or unknown health are skipped in preview and execution, while
-  other targets continue. A deployment is skipped if any of its CSV machines
-  references such an account. Health skips are reported separately in the summary.
-  Health is a periodic result, not a live connectivity guarantee; it does not
-  prove that vCenter is permanently unavailable.
+- Deleting non-MISSING machines requires the account to report `healthy=false`.
+  Targets on accounts with healthy or unknown health are skipped in preview and
+  execution, while other targets continue. Missing-only deletion does not check
+  account health, so missing VMs can be deleted regardless of vCenter state.
+  Health skips are reported separately in the summary. Health is a periodic
+  result, not a live connectivity guarantee; it does not prove that vCenter is
+  permanently unavailable.
 - There is no script-level undo. Do not proceed if the intention is to recover
   the existing vCenter and preserve these deployments under management.
 
@@ -126,14 +127,15 @@ preview with:
     -Password '<password>' -CsvFile .\managed-vms.csv -All
 ```
 
-`-All` bypasses only the missing-status filter. It does not bypass cloud-account
-health or membership checks. Without it, a deployment is skipped if any machine
-is not missing. Empty sync status is treated as `MISSING`, so review uncertain
-statuses rather than assuming physical absence.
+`-All` bypasses only the missing-status filter. Non-MISSING machines still
+require an unhealthy cloud account, and membership checks always apply. Without
+it, a deployment is skipped if any machine is not missing. Empty sync status is
+treated as `MISSING`, so review uncertain statuses rather than assuming
+physical absence.
 
 Review the preview for:
 
-- Correct account ID and `healthy=false`.
+- Correct account ID; any non-MISSING machine must report `healthy=false`.
 - Correct deployment and machine coverage, with no status-check errors.
 - Approval to remove every associated non-machine resource.
 - Expected skips and expected deployment count.
